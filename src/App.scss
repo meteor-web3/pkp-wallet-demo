@@ -1,0 +1,56 @@
+.App {
+  text-align: center;
+  padding: 10px 10%;
+
+  .block {
+    display: block;
+  }
+
+  .app-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+
+    .account {
+      min-width: 150px;
+      height: 40px;
+      border: solid 1px gainsboro;
+      border-radius: 4px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+  }
+
+  .app-body {
+    button {
+      width: 150px;
+      height: 40px;
+      margin: 20px 0;
+    }
+
+    input {
+      height: 50px;
+      width: calc(100% - 4px);
+      font-size: large;
+      border-radius: 10px;
+      border: 1px solid gray;
+    }
+
+    label {
+      text-align: left;
+      width: 100%;
+      margin: 20px 0;
+    }
+
+    .textarea {
+      width: calc(100% - 20px);
+      min-height: 150px;
+      border: 1px solid gainsboro;
+      border-radius: 10px;
+      padding: 10px;
+      overflow-wrap: break-word;
+      text-align: left;
+    }
+  }
+}
