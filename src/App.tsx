@@ -11,7 +11,7 @@ import * as LitJsSdk_types from "@lit-protocol/types";
 import { AccsDefaultParams } from '@lit-protocol/types';
 import { ethers } from 'ethers';
 import { joinSignature, UnsignedTransaction } from 'ethers/lib/utils';
-import {PKPEthersWallet} from '@lit-protocol/pkp-ethers';
+import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { CONTRACT_ABI, CONTRACT_ADDRESS, CONTRACT_SRC_CODE, REACT_APP_RELAY_API_URL, RPC_URL, SIGN_TYPED_DATA } from './lib/constant';
 
 function App() {
@@ -35,12 +35,19 @@ function App() {
   const [pkpWalletBalance, setPkpWalletBalance] = useState<string>('');
   const [pkpWalletTxCount, setPkpWalletTxCount] = useState<number | string>('');
   const [pkpWalletNewTxHash, setPkpWalletNewTxHash] = useState<string>('');
+  const [pkpSignature, setPkpSignature] = useState<string>('');
 
   useEffect(() => {
     if (rpcProvider) {
       updateValueOnChain();
     }
   }, [rpcProvider])
+
+  useEffect(() => {
+    if(pkpWallet) {
+      updateWalletInfo();
+    }
+  }, [pkpWallet])
 
   const runLitAction = async (toSign: Uint8Array, sigName: string) => {
     if (sessionSigs && pkpPublicKey) {
@@ -345,57 +352,105 @@ function App() {
     const controllerAuthSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'mumbai' });  // metamask or walletconnect
     console.log("controllerAuthSig=", controllerAuthSig)
     // if (authSig && pkpPublicKey) {
-      const pkpWallet = new PKPEthersWallet({
-        pkpPubKey,
-        controllerAuthSig,
-        rpc: RPC_URL,
-      });
+    const pkpEthersWallet = new PKPEthersWallet({
+      pkpPubKey,
+      controllerAuthSig,
+      rpc: RPC_URL,
+    });
 
-      console.log("pkpWallet=", pkpWallet)
+    console.log("pkpWallet=", pkpEthersWallet)
 
-      await pkpWallet.init();
+    await pkpEthersWallet.init();
+    setPkpWallet(pkpEthersWallet);
 
-      const updateWalletInfo = async () => {
-        await Promise.all([
-          async function() {
-            const address = await pkpWallet.getAddress();
-            setPkpWalletAddress(address);
-          }(),
-          async function() {
-            const balance = ethers.utils.formatEther(await pkpWallet.getBalance());
-            setPkpWalletBalance(balance)
-          }(),
-          async function() {
-            const txCount = await pkpWallet.getTransactionCount();
-            setPkpWalletTxCount(txCount);
-          }()
-        ])
-      }
-
-      const sendTransaction = async () => {
-        const tx = {
-          to: "0x13a6D1fe418de7e5B03Fb4a15352DfeA3249eAA4",
-          value: BigInt('10000000000000000'),
-        };
-        const signedTx = await pkpWallet.signTransaction(tx)
-        console.log('signedTx:', signedTx);
-  
-        const res = await pkpWallet.sendTransaction(signedTx);
-        console.log("res:", res)
-        setPkpWalletNewTxHash(res.hash);
-        await res.wait();
-        await updateWalletInfo();
-      }
-
-      const signMessage = async () => {
-        const signedMsg = await pkpWallet.signMessage("Secret Message.. shh!");
-        console.log('signedMsg:', signedMsg);
-      }
-
-      await updateWalletInfo();
-      await sendTransaction();
+    // await updateWalletInfo();
+    // await sendTransaction();
 
     // }
+  }
+
+  const updateWalletInfo = async () => {
+    if (pkpWallet) {
+      await Promise.all([
+        async function () {
+          const address = await pkpWallet.getAddress();
+          setPkpWalletAddress(address);
+        }(),
+        async function () {
+          const balance = ethers.utils.formatEther(await pkpWallet.getBalance());
+          setPkpWalletBalance(balance)
+        }(),
+        async function () {
+          const txCount = await pkpWallet.getTransactionCount();
+          setPkpWalletTxCount(txCount);
+        }()
+      ])
+    }
+  }
+
+  const sendTransactionByPkpWallet = async () => {
+    if (pkpWallet) {
+      const tx = {
+        to: "0x13a6D1fe418de7e5B03Fb4a15352DfeA3249eAA4",
+        value: BigInt('10000000000000000'),
+      };
+      const signedTx = await pkpWallet.signTransaction(tx)
+      console.log('signedTx:', signedTx);
+
+      const res = await pkpWallet.sendTransaction(signedTx);
+      console.log("res:", res)
+      setPkpWalletNewTxHash(res.hash);
+      await res.wait();
+      await updateWalletInfo();
+    }
+  }
+
+  const signMessageByPkpWallet = async () => {
+    if (pkpWallet) {
+      const signedMsg = await pkpWallet.signMessage("Secret Message.. shh!");
+      console.log('signedMsg:', signedMsg);
+    }
+  }
+
+  const handleOnClickSignTypedDataByPkpWallet = async () => {
+    // All properties on a domain are optional
+    const domain = {
+      chainId: 80001,
+    };
+
+    // The named list of all type definitions
+    const types = {
+      Person: [
+        { name: 'name', type: 'string' },
+        { name: 'wallet', type: 'address' }
+      ],
+      Mail: [
+        { name: 'from', type: 'Person' },
+        { name: 'to', type: 'Person' },
+        { name: 'contents', type: 'string' }
+      ]
+    };
+
+    // The data to sign
+    const value = {
+      from: {
+        name: 'Cow',
+        wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826'
+      },
+      to: {
+        name: 'Bob',
+        wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
+      },
+      contents: 'Hello, Bob!'
+    };
+    
+    if(pkpWallet) {
+      const signature = await pkpWallet._signTypedData(domain, types, value);
+      setPkpSignature(signature);
+      console.log("pkp signature: ", signature);
+    } else {
+      console.error("NO Pkp Wallet Instance")
+    }
   }
 
   return (
@@ -439,9 +494,18 @@ function App() {
         <div className='textarea typed'>{SIGN_TYPED_DATA}</div>
         <label className='block'>Signature</label>
         <div className='textarea'>{signature}</div>
+        <div className='divider' />
         <button onClick={createPkpWallet}>CreatePkpWallet</button>
         <label className='block'>Wallet Info</label>
-        <div className='textarea typed'>{`Address: ${pkpWalletAddress}\nBalance: ${pkpWalletBalance}\nTransactions Count: ${pkpWalletTxCount}\nNew Transaction Hash: ${pkpWalletNewTxHash}`}</div>
+        <div className='textarea typed'>{`Address: ${pkpWalletAddress}\nBalance: ${pkpWalletBalance}\nTransactions Count: ${pkpWalletTxCount}\n`}</div>
+        <button disabled={pkpWallet ? false : true} onClick={sendTransactionByPkpWallet}>SendTransaction By PKP-Wallet</button>
+        <label className='block'>Transaction Hash</label>
+        <div className='textarea'>{pkpWalletNewTxHash}</div>
+        <button disabled={pkpWallet ? false : true} onClick={handleOnClickSignTypedDataByPkpWallet}>SignTypedData By PKP-Wallet</button>
+        <label className='block'>Signature Typed Data</label>
+        <div className='textarea typed'>{SIGN_TYPED_DATA}</div>
+        <label className='block'>Signature By Pkp-Wallet</label>
+        <div className='textarea'>{pkpSignature}</div>
       </div>
     </div>
   );

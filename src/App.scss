@@ -10,6 +10,13 @@
     white-space: pre;
   }
 
+  .divider {
+    height: 4px;
+    width: 100%;
+    background-color: black;
+    margin: 50px 0;
+  }
+
   .app-header {
     display: flex;
     justify-content: space-between;
