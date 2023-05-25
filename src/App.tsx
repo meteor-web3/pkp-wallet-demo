@@ -110,6 +110,7 @@ function App() {
   const [pkpWalletAddress, setPkpWalletAddress] = useState<string>('');
   const [pkpWalletBalance, setPkpWalletBalance] = useState<string>('');
   const [pkpWalletTxCount, setPkpWalletTxCount] = useState<number | string>('');
+  const [pkpWalletNewTxHash, setPkpWalletNewTxHash] = useState<string>('');
 
   useEffect(() => {
     if (rpcProvider) {
@@ -118,7 +119,8 @@ function App() {
   }, [rpcProvider])
 
   const createPkpWallet = async () => {
-    const pkpPubKey = '0x044ea0dcd8c2cfbe0eb39cf6f52982f7da78c82fb6aaec8da0b390b250e97ef370edb2a423a4db802ef1660ab3ec8074b4350291810c7d778e88fda43470d7f9b7';
+    // const pkpPubKey = '0x044ea0dcd8c2cfbe0eb39cf6f52982f7da78c82fb6aaec8da0b390b250e97ef370edb2a423a4db802ef1660ab3ec8074b4350291810c7d778e88fda43470d7f9b7';    //google oauth
+    const pkpPubKey = '0x04cac1d3910e160b465527807c30364b3612632cd76eb764270afc159bcbc255aff1bb3150df2360b246bce4b11e99fec43364acb61f40e1f41168f5ced6d610d6';
     const controllerAuthSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'mumbai' });  // metamask or walletconnect
     console.log("controllerAuthSig=", controllerAuthSig)
     // if (authSig && pkpPublicKey) {
@@ -132,30 +134,45 @@ function App() {
 
       await pkpWallet.init();
 
-      await Promise.all([
-        async function() {
-          const address = await pkpWallet.getAddress();
-          setPkpWalletAddress(address);
-        }(),
-        async function() {
-          const balance = ethers.utils.formatEther(await pkpWallet.getBalance());
-          setPkpWalletBalance(balance)
-        }(),
-        async function() {
-          const txCount = await pkpWallet.getTransactionCount();
-          setPkpWalletTxCount(txCount);
-        }()
-      ])
+      const updateWalletInfo = async () => {
+        await Promise.all([
+          async function() {
+            const address = await pkpWallet.getAddress();
+            setPkpWalletAddress(address);
+          }(),
+          async function() {
+            const balance = ethers.utils.formatEther(await pkpWallet.getBalance());
+            setPkpWalletBalance(balance)
+          }(),
+          async function() {
+            const txCount = await pkpWallet.getTransactionCount();
+            setPkpWalletTxCount(txCount);
+          }()
+        ])
+      }
 
-      // const tx = {
-      //   to: "0x1cD4147AF045AdCADe6eAC4883b9310FD286d95a",
-      //   value: 0,
-      // };
-      // const signedTx = await pkpWallet.signTransaction(tx)
-      // console.log('signedTx:', signedTx);
+      const sendTransaction = async () => {
+        const tx = {
+          to: "0x13a6D1fe418de7e5B03Fb4a15352DfeA3249eAA4",
+          value: BigInt('10000000000000000'),
+        };
+        const signedTx = await pkpWallet.signTransaction(tx)
+        console.log('signedTx:', signedTx);
+  
+        const res = await pkpWallet.sendTransaction(signedTx);
+        console.log("res:", res)
+        setPkpWalletNewTxHash(res.hash);
+        await updateWalletInfo();
+      }
 
-      // const signedMsg = await pkpWallet.signMessage("Secret Message.. shh!");
-      // console.log('signedMsg:', signedMsg);
+      const signMessage = async () => {
+        const signedMsg = await pkpWallet.signMessage("Secret Message.. shh!");
+        console.log('signedMsg:', signedMsg);
+      }
+
+      await updateWalletInfo();
+      await sendTransaction();
+
     // }
   }
 
@@ -500,7 +517,7 @@ function App() {
         <div className='textarea'>{signature}</div>
         <button onClick={createPkpWallet}>CreatePkpWallet</button>
         <label className='block'>Wallet Info</label>
-        <div className='textarea typed'>{`Address: ${pkpWalletAddress}\nBalance: ${pkpWalletBalance}\nTransactions Count: ${pkpWalletTxCount}`}</div>
+        <div className='textarea typed'>{`Address: ${pkpWalletAddress}\nBalance: ${pkpWalletBalance}\nTransactions Count: ${pkpWalletTxCount}\nNew Transaction Hash: ${pkpWalletNewTxHash}`}</div>
       </div>
     </div>
   );
