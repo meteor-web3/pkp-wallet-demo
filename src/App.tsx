@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import './App.scss';
 import { GoogleLogin, GoogleOAuthProvider } from "@react-oauth/google";
 import { getLitNodeClient, getSessionSigs, mintPkp } from './services/lit';
-import { publicKeyToAddress } from './utils';
+import { publicKeyToAddress, retry } from './utils';
 import * as LitJsSdk from "@lit-protocol/lit-node-client";
 import * as LitJsSdk_accessControlConditions from "@lit-protocol/access-control-conditions";
 import * as LitJsSdk_blsSdk from "@lit-protocol/bls-sdk";
@@ -11,6 +11,8 @@ import * as LitJsSdk_types from "@lit-protocol/types";
 import { AccsDefaultParams } from '@lit-protocol/types';
 import { ethers, Transaction } from 'ethers';
 import { joinSignature, UnsignedTransaction } from 'ethers/lib/utils';
+// import { PKPWallet } from 'pkp-eth-signer';
+import {PKPEthersWallet} from '@lit-protocol/pkp-ethers';
 
 const RPC_URL = "https://rpc-mumbai.maticvigil.com/"
 const REACT_APP_RELAY_API_URL = "https://relay-server-staging.herokuapp.com"
@@ -90,6 +92,7 @@ const value = {
 `
 
 function App() {
+  const rpcProvider: ethers.providers.JsonRpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
   const [account, setAccount] = useState("Account Address");
   const [credentialResponse, setCredentialResponse] = useState();
   const [message, setMessage] = useState<string>();
@@ -97,19 +100,64 @@ function App() {
   const [decryptMessage, setDecryptMessage] = useState<string>();
   const [encryptedSymmetricKey, setEncryptedSymmetricKey] = useState<Uint8Array>();
   const [sessionSigs, setSessionSigs] = useState<LitJsSdk_types.SessionSigsMap>();
+  const [authSig, setAuthSig] = useState<LitJsSdk_types.AuthSig>();
   const [pkpPublicKey, setPkpPublicKey] = useState<string>();
   // const [txParams, setTxParams] = useState<UnsignedTransaction>();
   const [signature, setSignature] = useState<string>();
   const [valueNew, setValueNew] = useState<string>();
   const [valueOnChain, setValueOnChain] = useState<number>();
   const [transactionHash, setTransactionHash] = useState<string>();
-  const rpcProvider: ethers.providers.JsonRpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
+  const [pkpWalletAddress, setPkpWalletAddress] = useState<string>('');
+  const [pkpWalletBalance, setPkpWalletBalance] = useState<string>('');
+  const [pkpWalletTxCount, setPkpWalletTxCount] = useState<number | string>('');
 
   useEffect(() => {
     if (rpcProvider) {
       updateValueOnChain();
     }
   }, [rpcProvider])
+
+  const createPkpWallet = async () => {
+    const pkpPubKey = '0x044ea0dcd8c2cfbe0eb39cf6f52982f7da78c82fb6aaec8da0b390b250e97ef370edb2a423a4db802ef1660ab3ec8074b4350291810c7d778e88fda43470d7f9b7';
+    const controllerAuthSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'mumbai' });  // metamask or walletconnect
+    console.log("controllerAuthSig=", controllerAuthSig)
+    // if (authSig && pkpPublicKey) {
+      const pkpWallet = new PKPEthersWallet({
+        pkpPubKey,
+        controllerAuthSig,
+        rpc: RPC_URL,
+      });
+
+      console.log("pkpWallet=", pkpWallet)
+
+      await pkpWallet.init();
+
+      await Promise.all([
+        async function() {
+          const address = await pkpWallet.getAddress();
+          setPkpWalletAddress(address);
+        }(),
+        async function() {
+          const balance = ethers.utils.formatEther(await pkpWallet.getBalance());
+          setPkpWalletBalance(balance)
+        }(),
+        async function() {
+          const txCount = await pkpWallet.getTransactionCount();
+          setPkpWalletTxCount(txCount);
+        }()
+      ])
+
+      // const tx = {
+      //   to: "0x1cD4147AF045AdCADe6eAC4883b9310FD286d95a",
+      //   value: 0,
+      // };
+      // const signedTx = await pkpWallet.signTransaction(tx)
+      // console.log('signedTx:', signedTx);
+
+      // const signedMsg = await pkpWallet.signMessage("Secret Message.. shh!");
+      // console.log('signedMsg:', signedMsg);
+    // }
+  }
 
   const runLitAction = async (toSign: Uint8Array, sigName: string) => {
     if (sessionSigs && pkpPublicKey) {
@@ -237,19 +285,32 @@ function App() {
       console.log(`encryptedSymmetricKey=${encryptedSymmetricKey}`)
       setEncryptedSymmetricKey(encryptedSymmetricKey);
 
-      const { sessionSigs, authenticatedPkpPublicKey } = await getSessionSigs(
+
+      const authMethod = litNodeClient.generateAuthMethodForGoogleJWT(
+        (credentialResponse as any).credential
+      );
+
+      const { sessionSigs, authenticatedPkpPublicKey, litAuthSig } = await getSessionSigs(
         litNodeClient,
         encryptedSymmetricKey,
-        litNodeClient.generateAuthMethodForGoogleJWT(
-          (credentialResponse as any).credential
-        )
+        authMethod
       );
+
+      // const { sessionSigs, authenticatedPkpPublicKey } = await retry(async () => {
+      //   await getSessionSigs(
+      //     litNodeClient,
+      //     encryptedSymmetricKey,
+      //     authMethod
+      //   );
+      // })
 
       console.log("sessionSigs: ", sessionSigs);
       console.log("authenticatedPkpPublicKey: ", authenticatedPkpPublicKey);
+      console.log("authSig: ", litAuthSig);
 
       setSessionSigs(sessionSigs);
       setPkpPublicKey(authenticatedPkpPublicKey);
+      setAuthSig(litAuthSig);
 
       const pkpEthAddress = publicKeyToAddress(authenticatedPkpPublicKey);
       setAccount(pkpEthAddress);
@@ -437,6 +498,9 @@ function App() {
         <div className='textarea typed'>{SIGN_DATA}</div>
         <label className='block'>Signature</label>
         <div className='textarea'>{signature}</div>
+        <button onClick={createPkpWallet}>CreatePkpWallet</button>
+        <label className='block'>Wallet Info</label>
+        <div className='textarea typed'>{`Address: ${pkpWalletAddress}\nBalance: ${pkpWalletBalance}\nTransactions Count: ${pkpWalletTxCount}`}</div>
       </div>
     </div>
   );

@@ -10,6 +10,7 @@
     "@lit-protocol/crypto": "^2.2.0",
     "@lit-protocol/lit-node-client": "^2.2.0",
     "@lit-protocol/lit-node-client-nodejs": "^2.2.0",
+    "@lit-protocol/pkp-ethers": "^2.2.10",
     "@lit-protocol/types": "^2.2.0",
     "@react-oauth/google": "^0.11.0",
     "@testing-library/jest-dom": "^5.16.5",

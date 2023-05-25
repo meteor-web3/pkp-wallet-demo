@@ -10,6 +10,14 @@ module.exports = {
 			}
 			return rule;
 		});
+    
+        config.resolve.fallback = { 
+            ...config.resolve.fallback,
+            "https": false,
+            "http": false,
+            "zlib": false,
+            "url": false
+        };
 		return config;
 	},
 };

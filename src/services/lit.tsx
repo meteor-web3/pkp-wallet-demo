@@ -24,8 +24,10 @@ async function getSessionSigs(
 ): Promise<{
 	sessionSigs: LitJsSdk_types.SessionSigsMap;
 	authenticatedPkpPublicKey: string;
+	litAuthSig: LitJsSdk_types.AuthSig
 }> {
 	let authenticatedPkpPublicKey: string;
+	let litAuthSig: LitJsSdk_types.AuthSig;
 
 	// this will be fired if auth is needed. we can use this to prompt the user to sign in
 	const authNeededCallback: AuthCallback = async ({
@@ -53,6 +55,7 @@ async function getSessionSigs(
 		});
 
 		authenticatedPkpPublicKey = pkpPublicKey;
+		litAuthSig = authSig;
 
 		return authSig;
 	};
@@ -89,6 +92,7 @@ async function getSessionSigs(
 	return {
 		sessionSigs,
 		authenticatedPkpPublicKey: authenticatedPkpPublicKey!,
+		litAuthSig: litAuthSig!,
 	};
 }
 
