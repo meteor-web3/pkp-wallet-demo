@@ -5,11 +5,12 @@ import * as LitJsSdk_authHelpers from "@lit-protocol/auth-helpers";
 import * as LitJsSdk_types from "@lit-protocol/types";
 import { AccsDefaultParams, AuthSig, AuthCallback } from "@lit-protocol/types";
 
-const REACT_APP_RELAY_API_URL="https://relay-server-staging.herokuapp.com"
+const REACT_APP_RELAY_API_URL = "https://relay-server-staging.herokuapp.com"
 
 async function getLitNodeClient(): Promise<LitJsSdk.LitNodeClient> {
 	const litNodeClient = new LitJsSdk.LitNodeClient({
 		litNetwork: "serrano",
+		debug: false
 	});
 	await litNodeClient.connect();
 
@@ -84,8 +85,6 @@ async function getSessionSigs(
 		switchChain: false,
 		authNeededCallback,
 	});
-	console.log("sessionSigs: ", sessionSigs);
-	console.log("authenticatedPkpPublicKey: ", authenticatedPkpPublicKey!);
 
 	return {
 		sessionSigs,
@@ -129,5 +128,5 @@ async function hashBytes({ bytes }: { bytes: Uint8Array }): Promise<string> {
 export {
 	getLitNodeClient,
 	getSessionSigs,
-	mintPkp
+	mintPkp,
 }
