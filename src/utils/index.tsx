@@ -5,13 +5,14 @@ function publicKeyToAddress(publicKey: string) {
 }
 
 async function retry(func: any, maxRetries = 50) {
+    const maxCount = maxRetries;
     while (maxRetries > 0) {
         try {
             const result = await func();
             return result;
         } catch (error) {
             maxRetries--;
-            console.log(`>>>>>>>>retry count: ${50 - maxRetries}`)
+            console.log(`[retry count]: ${maxCount - maxRetries}`)
             if (maxRetries === 0) {
                 throw error;
             }

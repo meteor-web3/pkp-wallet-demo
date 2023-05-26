@@ -47,6 +47,8 @@ contract Test {
 }
 `
 
+const MESSAGE = 'Hello World!'
+
 const SIGN_TYPED_DATA = `
 const domain = {
   chainId: 80001,
@@ -77,6 +79,12 @@ const value = {
 };  
 `
 
+const LIT_ACTION_CODE = `
+(async () => {
+    const latestNonce = await Lit.Actions.getLatestNonce({ address, chain });
+    Lit.Actions.setResponse({response: JSON.stringify({latestNonce})});
+})();`;
+
 export {
     RPC_URL,
     REACT_APP_RELAY_API_URL,
@@ -84,5 +92,7 @@ export {
     CONTRACT_ADDRESS,
     CONTRACT_ABI,
     CONTRACT_SRC_CODE,
-    SIGN_TYPED_DATA
+    SIGN_TYPED_DATA,
+    MESSAGE,
+    LIT_ACTION_CODE
 }
