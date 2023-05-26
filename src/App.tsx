@@ -13,6 +13,9 @@ import { ethers } from 'ethers';
 import { joinSignature, UnsignedTransaction } from 'ethers/lib/utils';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { CONTRACT_ABI, CONTRACT_ADDRESS, CONTRACT_SRC_CODE, REACT_APP_RELAY_API_URL, RPC_URL, SIGN_TYPED_DATA } from './lib/constant';
+import MessageJson from './json/message.json';
+import { SiweMessage } from 'ceramic-cacao';
+import axios from 'axios';
 
 function App() {
   const rpcProvider: ethers.providers.JsonRpcProvider = new ethers.providers.JsonRpcProvider(RPC_URL);
@@ -44,7 +47,7 @@ function App() {
   }, [rpcProvider])
 
   useEffect(() => {
-    if(pkpWallet) {
+    if (pkpWallet) {
       updateWalletInfo();
     }
   }, [pkpWallet])
@@ -443,14 +446,82 @@ function App() {
       },
       contents: 'Hello, Bob!'
     };
-    
-    if(pkpWallet) {
+
+    if (pkpWallet) {
       const signature = await pkpWallet._signTypedData(domain, types, value);
       setPkpSignature(signature);
       console.log("pkp signature: ", signature);
     } else {
       console.error("NO Pkp Wallet Instance")
     }
+  }
+
+  const modifyJson = async (address: string) => {
+    const now = new Date();
+    const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    try {
+      const res = await axios({
+        url: `https://gateway.dataverse.art/v1/siwe/nonce`,
+        method: "post",
+        data: {
+          address,
+          domain: window.location.host,
+        },
+      });
+      const nonce = res.data.data.nonce;
+      MessageJson.nonce = nonce;
+      MessageJson.issuedAt = now.toISOString();
+      MessageJson.expirationTime = oneWeekLater.toISOString();
+    } catch (error) {
+      console.error(error);
+    } finally {
+      return MessageJson;
+    }
+  }
+
+  const operateLitActionsDirectly = async () => {
+    const provider = new ethers.providers.Web3Provider((window as any).ethereum);
+    const [account] = await provider.send("eth_requestAccounts", []);
+    console.log("account:", account)
+    const signer = provider.getSigner();
+    const newJson = await modifyJson(account);
+    console.log("newJson:", newJson)
+    const siweMessage = new SiweMessage(newJson);
+    const message = siweMessage.toMessage();
+    console.log("message:", message)
+    const signature = await signer.signMessage(message);
+    console.log('signature:', signature)
+    const authSig = {
+      sig: signature,
+      derivedVia: "web3.eth.personal.sign",
+      signedMessage: message,
+      address: account,
+    }
+
+    const litNodeClient = await getLitNodeClient();
+    const litActionCode = `
+      (async () => {
+        const latestNonce = await Lit.Actions.getLatestNonce({ address, chain });
+        Lit.Actions.setResponse({response: JSON.stringify({latestNonce})});
+      })();`;
+
+    const getAuthSig = async () => {
+      const controllerAuthSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'mumbai' });  // metamask or walletconnect
+      console.log("controllerAuthSig:", controllerAuthSig)
+      return controllerAuthSig
+    }
+
+    const executeJsArgs = {
+      authSig,
+      code: litActionCode,
+      // sessionSigs: sessionSigs,
+      jsParams: {
+        address: account,
+        chain: 'mumbai'
+      },
+    };
+    const res = await litNodeClient.executeJs(executeJsArgs as any);
+    console.log("executeJs res:", res)
   }
 
   return (
@@ -506,6 +577,7 @@ function App() {
         <div className='textarea typed'>{SIGN_TYPED_DATA}</div>
         <label className='block'>Signature By Pkp-Wallet</label>
         <div className='textarea'>{pkpSignature}</div>
+        <button onClick={operateLitActionsDirectly}>Operate LitAction</button>
       </div>
     </div>
   );
