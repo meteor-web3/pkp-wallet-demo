@@ -118,7 +118,7 @@ const Main = () => {
             const mintedPkpPubkeys = await getPkpPubkeysByAddress(controllerAuthSig.address);
             console.log("mintedPkpPubkeys=", mintedPkpPubkeys)
             if(mintedPkpPubkeys.length == 0) {
-                console.error('Please mint PKP NFT at https://explorer.litprotocol.com/mint-pkp first.');
+                alert('Please mint PKP NFT at https://explorer.litprotocol.com/mint-pkp first.');
                 return;
             }
             const pkpEthersWallet = new PKPEthersWallet({
@@ -251,6 +251,7 @@ const Main = () => {
                     },
                 });
                 const nonce = res.data.data.nonce;
+                MessageJson.address = ethers.utils.getAddress(address);     // to checksum address
                 MessageJson.nonce = nonce;
                 MessageJson.issuedAt = now.toISOString();
                 MessageJson.expirationTime = oneWeekLater.toISOString();
