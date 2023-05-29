@@ -6,8 +6,9 @@ import * as LitJsSdk_types from "@lit-protocol/types";
 import { AccsDefaultParams, AuthSig, AuthCallback, AuthMethod, IRelayPKP } from "@lit-protocol/types";
 import { BaseProvider, isSignInRedirect, LitAuthClient } from "@lit-protocol/lit-auth-client";
 import { LitAbility } from "@lit-protocol/auth-helpers";
+import { RELAY_API_KEY } from "./constant";
 
-const REACT_APP_RELAY_API_URL = "https://relay-server-staging.herokuapp.com"
+// const REACT_APP_RELAY_API_URL = "https://relay-server-staging.herokuapp.com"
 
 enum ProviderType {
 	Discord = "discord",
@@ -21,7 +22,7 @@ function getLitAuthClient(): LitAuthClient {
 	const litAuthClient = new LitAuthClient({
 		litRelayConfig: {
 			// Request a Lit Relay Server API key here: https://forms.gle/RNZYtGYTY9BcD9MEA
-			relayApiKey: REACT_APP_RELAY_API_URL,
+			relayApiKey: RELAY_API_KEY,
 		},
 	});
 	console.log("litAuthClient:", litAuthClient)

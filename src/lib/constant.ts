@@ -1,5 +1,5 @@
 const RPC_URL = "https://rpc-mumbai.maticvigil.com/"
-const REACT_APP_RELAY_API_URL = "https://relay-server-staging.herokuapp.com"
+const RELAY_API_KEY = "0D7D660D-FA48-4AC7-8376-E14CDC2B350A_dataverse"
 const REACT_APP_RPC_URL = "https://chain-rpc.litprotcol.com/http"
 const CONTRACT_ADDRESS = "0xa3EFb397e49d36D4F8d59A4bad62d63e3a8aB91d"
 const CONTRACT_ABI = [{
@@ -87,7 +87,7 @@ const LIT_ACTION_CODE = `
 
 export {
     RPC_URL,
-    REACT_APP_RELAY_API_URL,
+    RELAY_API_KEY,
     REACT_APP_RPC_URL,
     CONTRACT_ADDRESS,
     CONTRACT_ABI,

@@ -259,11 +259,6 @@ const Main = () => {
         }
 
         const litNodeClient = await getLitNodeClient();
-        const litActionCode = `
-            (async () => {
-                const latestNonce = await Lit.Actions.getLatestNonce({ address, chain });
-                Lit.Actions.setResponse({response: JSON.stringify({latestNonce})});
-            })();`;
 
         const getLitAuthSig = async () => {
             const controllerAuthSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'mumbai' });  // metamask or walletconnect
@@ -273,7 +268,7 @@ const Main = () => {
 
         const executeJsArgs = {
             authSig,
-            code: litActionCode,
+            code: LIT_ACTION_CODE,
             // sessionSigs: sessionSigs,
             jsParams: {
                 address: account,
