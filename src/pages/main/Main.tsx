@@ -4,10 +4,11 @@ import { getLitAuthClient, getLitNodeClient, getRelayerPkps, getSessionSigs, min
 import * as LitJsSdk from "@lit-protocol/lit-node-client";
 import * as LitJsSdk_types from "@lit-protocol/types";
 import { AuthMethod } from '@lit-protocol/types';
-import { ethers } from 'ethers';
+import { Contract, ethers } from 'ethers';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
-import { RPC_URL, SIGN_TYPED_DATA, MESSAGE, LIT_ACTION_CODE } from '../../lib/constant';
+import { MUMBAI_RPC_URL, CHRONICLE_RPC_URL, SIGN_TYPED_DATA, MESSAGE, LIT_ACTION_CODE, PUBKEY_ROUTER_CONTRACT_ADDRESS } from '../../lib/constant';
 import MessageJson from '../../json/message.json';
+import PubkeyRouterJson from '../../contracts/PubkeyRouter.json'
 import { SiweMessage } from 'ceramic-cacao';
 import axios from 'axios';
 import { BaseProvider, isSignInRedirect } from '@lit-protocol/lit-auth-client';
@@ -96,14 +97,34 @@ const Main = () => {
 
     const createPkpWallet = async (type: string) => {
         if (type === 'otherwallets') {
-            // const pkpPubKey = '0x044ea0dcd8c2cfbe0eb39cf6f52982f7da78c82fb6aaec8da0b390b250e97ef370edb2a423a4db802ef1660ab3ec8074b4350291810c7d778e88fda43470d7f9b7';    //google oauth
-            const pkpPubKey = '0x04cac1d3910e160b465527807c30364b3612632cd76eb764270afc159bcbc255aff1bb3150df2360b246bce4b11e99fec43364acb61f40e1f41168f5ced6d610d6';
+            const getPkpPubkeysByAddress = async (address: string) => {
+                const res = await axios.get(`https://explorer.litprotocol.com/api/get-pkps-by-address/${address}`);
+                console.log(res);
+
+                const pubkeyRouter = new Contract(
+                    PUBKEY_ROUTER_CONTRACT_ADDRESS,
+                    PubkeyRouterJson.abi,
+                    new ethers.providers.JsonRpcProvider(CHRONICLE_RPC_URL)
+                );
+
+                return await Promise.all(res.data.data.map(async (item: any) => {
+                    const pubKey = await pubkeyRouter.getPubkey(item.tokenID);
+                    console.log("pubKey=", pubKey);
+                    return pubKey;
+                }))
+            }
             const controllerAuthSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'mumbai' });  // metamask or walletconnect
             console.log("controllerAuthSig=", controllerAuthSig)
+            const mintedPkpPubkeys = await getPkpPubkeysByAddress(controllerAuthSig.address);
+            console.log("mintedPkpPubkeys=", mintedPkpPubkeys)
+            if(mintedPkpPubkeys.length == 0) {
+                console.error('Please mint PKP NFT at https://explorer.litprotocol.com/mint-pkp first.');
+                return;
+            }
             const pkpEthersWallet = new PKPEthersWallet({
-                pkpPubKey,
+                pkpPubKey: mintedPkpPubkeys[0],
                 controllerAuthSig,
-                rpc: RPC_URL,
+                rpc: MUMBAI_RPC_URL,
             });
 
             console.log("pkpWallet(otherwallets):", pkpEthersWallet)
@@ -116,7 +137,7 @@ const Main = () => {
                     const pkpEthersWallet = new PKPEthersWallet({
                         pkpPubKey: pkpPublicKey,
                         controllerSessionSigs: sessionSigs,   //sessionSigs['https://serrano.litgateway.com:7370']
-                        rpc: RPC_URL,
+                        rpc: MUMBAI_RPC_URL,
                     });
                     console.log("pkpWallet(google):", pkpEthersWallet)
                     await pkpEthersWallet.init();

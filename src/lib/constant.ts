@@ -1,8 +1,10 @@
-const RPC_URL = "https://rpc-mumbai.maticvigil.com/"
+const MUMBAI_RPC_URL = "https://rpc-mumbai.maticvigil.com/"
+const CHRONICLE_RPC_URL = "https://chain-rpc.litprotocol.com/http"
 const RELAY_API_KEY = "0D7D660D-FA48-4AC7-8376-E14CDC2B350A_dataverse"
 const REACT_APP_RPC_URL = "https://chain-rpc.litprotcol.com/http"
-const CONTRACT_ADDRESS = "0xa3EFb397e49d36D4F8d59A4bad62d63e3a8aB91d"
-const CONTRACT_ABI = [{
+const PUBKEY_ROUTER_CONTRACT_ADDRESS = "0xB35cC6CaB1501d5F3b6b8fcF3215898C9d03E981"
+const TEST_CONTRACT_ADDRESS = "0xa3EFb397e49d36D4F8d59A4bad62d63e3a8aB91d"
+const TEST_CONTRACT_ABI = [{
   "inputs": [
     {
       "internalType": "uint256",
@@ -86,11 +88,13 @@ const LIT_ACTION_CODE = `
 })();`;
 
 export {
-    RPC_URL,
+    MUMBAI_RPC_URL,
+    CHRONICLE_RPC_URL,
     RELAY_API_KEY,
     REACT_APP_RPC_URL,
-    CONTRACT_ADDRESS,
-    CONTRACT_ABI,
+    PUBKEY_ROUTER_CONTRACT_ADDRESS,
+    TEST_CONTRACT_ADDRESS,
+    TEST_CONTRACT_ABI,
     CONTRACT_SRC_CODE,
     SIGN_TYPED_DATA,
     MESSAGE,
