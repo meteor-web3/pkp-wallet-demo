@@ -1,17 +1,16 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './Main.scss';
-import { getLitAuthClient, getLitNodeClient, getRelayerPkps, getSessionSigs, mintPkp, ProviderType } from '../../lib/lit';
+import { getLitAuthClient, getLitNodeClient, getPkpPubkeysByAddress, getRelayerPkps, getSessionSigs, mintPkp } from '../../lib/lit';
 import * as LitJsSdk from "@lit-protocol/lit-node-client";
 import * as LitJsSdk_types from "@lit-protocol/types";
 import { AuthMethod } from '@lit-protocol/types';
-import { Contract, ethers } from 'ethers';
+import { ethers } from 'ethers';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
-import { MUMBAI_RPC_URL, CHRONICLE_RPC_URL, SIGN_TYPED_DATA, MESSAGE, LIT_ACTION_CODE, PUBKEY_ROUTER_CONTRACT_ADDRESS } from '../../lib/constant';
-import MessageJson from '../../json/message.json';
-import PubkeyRouterJson from '../../contracts/PubkeyRouter.json'
+import { MUMBAI_RPC_URL, SIGN_TYPED_DATA_CODE, MESSAGE, LIT_ACTION_CALL_CODE, LIT_ACTION_SIGN_CODE, SIGN_TYPED_DATA } from '../../lib/constant';
 import { SiweMessage } from 'ceramic-cacao';
-import axios from 'axios';
 import { BaseProvider, isSignInRedirect } from '@lit-protocol/lit-auth-client';
+import { LitActionType, ProviderType } from '../../types';
+import { getRawMessage } from '../../lib/message';
 
 const Main = () => {
     const [googleProvider, setGoogleProvider] = useState<BaseProvider>();
@@ -97,27 +96,11 @@ const Main = () => {
 
     const createPkpWallet = async (type: string) => {
         if (type === 'otherwallets') {
-            const getPkpPubkeysByAddress = async (address: string) => {
-                const res = await axios.get(`https://explorer.litprotocol.com/api/get-pkps-by-address/${address}`);
-                console.log(res);
-
-                const pubkeyRouter = new Contract(
-                    PUBKEY_ROUTER_CONTRACT_ADDRESS,
-                    PubkeyRouterJson.abi,
-                    new ethers.providers.JsonRpcProvider(CHRONICLE_RPC_URL)
-                );
-
-                return await Promise.all(res.data.data.map(async (item: any) => {
-                    const pubKey = await pubkeyRouter.getPubkey(item.tokenID);
-                    console.log("pubKey=", pubKey);
-                    return pubKey;
-                }))
-            }
             const controllerAuthSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'mumbai' });  // metamask or walletconnect
             console.log("controllerAuthSig=", controllerAuthSig)
             const mintedPkpPubkeys = await getPkpPubkeysByAddress(controllerAuthSig.address);
             console.log("mintedPkpPubkeys=", mintedPkpPubkeys)
-            if(mintedPkpPubkeys.length == 0) {
+            if (mintedPkpPubkeys.length == 0) {
                 alert('Please mint PKP NFT at https://explorer.litprotocol.com/mint-pkp first.');
                 return;
             }
@@ -197,39 +180,8 @@ const Main = () => {
     }
 
     const handleSignTypedData = async () => {
-        // All properties on a domain are optional
-        const domain = {
-            chainId: 80001,
-        };
-
-        // The named list of all type definitions
-        const types = {
-            Person: [
-                { name: 'name', type: 'string' },
-                { name: 'wallet', type: 'address' }
-            ],
-            Mail: [
-                { name: 'from', type: 'Person' },
-                { name: 'to', type: 'Person' },
-                { name: 'contents', type: 'string' }
-            ]
-        };
-
-        // The data to sign
-        const value = {
-            from: {
-                name: 'Cow',
-                wallet: '0xCD2a3d9F938E13CD947Ec05AbC7FE734Df8DD826'
-            },
-            to: {
-                name: 'Bob',
-                wallet: '0xbBbBBBBbbBBBbbbBbbBbbbbBBbBbbbbBbBbbBBbB'
-            },
-            contents: 'Hello, Bob!'
-        };
-
         if (pkpWallet) {
-            const signature = await pkpWallet._signTypedData(domain, types, value);
+            const signature = await pkpWallet._signTypedData(SIGN_TYPED_DATA.domain, SIGN_TYPED_DATA.types, SIGN_TYPED_DATA.value);
             setPkpSignature(signature);
             console.log("pkp signature: ", signature);
         } else {
@@ -237,36 +189,12 @@ const Main = () => {
         }
     }
 
-    const handleOperateLitActions = async () => {
-        const modifyJson = async (address: string) => {
-            const now = new Date();
-            const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-            try {
-                const res = await axios({
-                    url: `https://gateway.dataverse.art/v1/siwe/nonce`,
-                    method: "post",
-                    data: {
-                        address,
-                        domain: window.location.host,
-                    },
-                });
-                const nonce = res.data.data.nonce;
-                MessageJson.address = ethers.utils.getAddress(address);     // to checksum address
-                MessageJson.nonce = nonce;
-                MessageJson.issuedAt = now.toISOString();
-                MessageJson.expirationTime = oneWeekLater.toISOString();
-            } catch (error) {
-                console.error(error);
-            } finally {
-                return MessageJson;
-            }
-        }
-
+    const handleOperateLitActions = async (litActionType: LitActionType) => {
         const provider = new ethers.providers.Web3Provider((window as any).ethereum);
-        const [account] = await provider.send("eth_requestAccounts", []);
-        console.log("account:", account)
+        const [accountAddress] = await provider.send("eth_requestAccounts", []);
+        console.log("accountAddress:", accountAddress)
         const signer = provider.getSigner();
-        const newJson = await modifyJson(account);
+        const newJson = await getRawMessage(accountAddress);
         console.log("newJson:", newJson)
         const siweMessage = new SiweMessage(newJson);
         const message = siweMessage.toMessage();
@@ -277,26 +205,40 @@ const Main = () => {
             sig: signature,
             derivedVia: "web3.eth.personal.sign",
             signedMessage: message,
-            address: account,
+            address: accountAddress,
         }
 
         const litNodeClient = await getLitNodeClient();
 
-        const getLitAuthSig = async () => {
-            const controllerAuthSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'mumbai' });  // metamask or walletconnect
-            console.log("controllerAuthSig:", controllerAuthSig)
-            return controllerAuthSig
+        let executeJsArgs: any;
+        if (litActionType === LitActionType.Call) {
+            executeJsArgs = {
+                authSig,
+                code: LIT_ACTION_CALL_CODE,
+                // sessionSigs: sessionSigs,
+                jsParams: {
+                    address: accountAddress,
+                    chain: 'mumbai'
+                },
+            };
+        } else {
+            const mintedPkpPubkeys = await getPkpPubkeysByAddress(accountAddress);
+            console.log("mintedPkpPubkeys=", mintedPkpPubkeys)
+            if (mintedPkpPubkeys.length == 0) {
+                alert('Please mint PKP NFT at https://explorer.litprotocol.com/mint-pkp first.');
+                return;
+            }
+            executeJsArgs = {
+                authSig,
+                code: LIT_ACTION_SIGN_CODE,
+                // sessionSigs: sessionSigs,
+                jsParams: {
+                    toSign: [72, 101, 108, 108, 111, 32, 87, 111, 114, 108, 100],
+                    publicKey: mintedPkpPubkeys[0],
+                    sigName: "sig1",
+                },
+            };
         }
-
-        const executeJsArgs = {
-            authSig,
-            code: LIT_ACTION_CODE,
-            // sessionSigs: sessionSigs,
-            jsParams: {
-                address: account,
-                chain: 'mumbai'
-            },
-        };
         const res = await litNodeClient.executeJs(executeJsArgs as any);
         console.log("executeJs res:", res);
         setLitActionResult(JSON.stringify(res));
@@ -327,13 +269,16 @@ const Main = () => {
                 <div className='textarea'>{pkpSignedMessage}</div>
                 <button disabled={pkpWallet ? false : true} onClick={handleSignTypedData}>SignTypedData</button>
                 <label className='block'>Signature Typed Data</label>
-                <div className='textarea typed'>{SIGN_TYPED_DATA}</div>
+                <div className='textarea typed'>{SIGN_TYPED_DATA_CODE}</div>
                 <label className='block'>Signature</label>
                 <div className='textarea'>{pkpSignature}</div>
                 <div className='divider' />
-                <button onClick={handleOperateLitActions}>Run LitAction ( AuthSig generate by MetaMask ) </button>
-                <label className='block'>LitAction</label>
-                <div className='textarea typed'>{LIT_ACTION_CODE}</div>
+                <button onClick={() => handleOperateLitActions(LitActionType.Call)}>Run Call LitAction ( AuthSig generate by MetaMask ) </button>
+                <button onClick={() => handleOperateLitActions(LitActionType.Sign)}>Run Sign LitAction ( AuthSig generate by MetaMask ) </button>
+                <label className='block'>Call LitAction</label>
+                <div className='textarea typed'>{LIT_ACTION_CALL_CODE}</div>
+                <label className='block'>Sign LitAction</label>
+                <div className='textarea typed'>{LIT_ACTION_SIGN_CODE}</div>
                 <label className='block'>Result</label>
                 <div className='textarea typed'>{litActionResult}</div>
             </div>

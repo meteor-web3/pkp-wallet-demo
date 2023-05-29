@@ -1,22 +1,15 @@
 import * as LitJsSdk from "@lit-protocol/lit-node-client";
-import * as LitJsSdk_accessControlConditions from "@lit-protocol/access-control-conditions";
-import * as LitJsSdk_blsSdk from "@lit-protocol/bls-sdk";
 import * as LitJsSdk_authHelpers from "@lit-protocol/auth-helpers";
-import * as LitJsSdk_types from "@lit-protocol/types";
-import { AccsDefaultParams, AuthSig, AuthCallback, AuthMethod, IRelayPKP } from "@lit-protocol/types";
-import { BaseProvider, isSignInRedirect, LitAuthClient } from "@lit-protocol/lit-auth-client";
+import { AuthMethod, IRelayPKP } from "@lit-protocol/types";
+import { BaseProvider, LitAuthClient } from "@lit-protocol/lit-auth-client";
 import { LitAbility } from "@lit-protocol/auth-helpers";
-import { RELAY_API_KEY } from "./constant";
+import { CHRONICLE_RPC_URL, PUBKEY_ROUTER_CONTRACT_ADDRESS, RELAY_API_KEY } from "./constant";
+import axios from "axios";
+import { Contract, ethers } from "ethers";
+import PubkeyRouterJson from '../contracts/PubkeyRouter.json'
+import { ProviderType } from "../types";
 
 // const REACT_APP_RELAY_API_URL = "https://relay-server-staging.herokuapp.com"
-
-enum ProviderType {
-	Discord = "discord",
-	Google = "google",
-	EthWallet = "ethwallet",
-	WebAuthn = "webauthn",
-	Otp = "otp"
-}
 
 function getLitAuthClient(): LitAuthClient {
 	const litAuthClient = new LitAuthClient({
@@ -75,11 +68,35 @@ async function getLitNodeClient(): Promise<LitJsSdk.LitNodeClient> {
 	return litNodeClient;
 }
 
+const getLitAuthSig = async () => {
+	const controllerAuthSig = await LitJsSdk.checkAndSignAuthMessage({ chain: 'mumbai' });  // metamask or walletconnect
+	console.log("controllerAuthSig:", controllerAuthSig)
+	return controllerAuthSig
+}
+
+const getPkpPubkeysByAddress = async (address: string) => {
+	const res = await axios.get(`https://explorer.litprotocol.com/api/get-pkps-by-address/${address}`);
+	console.log(res);
+
+	const pubkeyRouter = new Contract(
+		PUBKEY_ROUTER_CONTRACT_ADDRESS,
+		PubkeyRouterJson.abi,
+		new ethers.providers.JsonRpcProvider(CHRONICLE_RPC_URL)
+	);
+
+	return await Promise.all(res.data.data.map(async (item: any) => {
+		const pubKey = await pubkeyRouter.getPubkey(item.tokenID);
+		console.log("pubKey=", pubKey);
+		return pubKey;
+	}))
+}
+
 export {
 	getLitAuthClient,
 	getLitNodeClient,
 	getSessionSigs,
 	mintPkp,
 	getRelayerPkps,
-	ProviderType
+	getLitAuthSig,
+	getPkpPubkeysByAddress
 }
